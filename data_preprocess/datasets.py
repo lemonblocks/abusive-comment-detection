@@ -2,10 +2,11 @@ import torch
 import torch.utils.data as tud
 import pandas as pd
 import torchtext
+import numpy as np
 from collections import Counter, OrderedDict
 
 
-def build_vocab(train_csv=None, dev_csv=None):
+def build_vocab(train_csv=None, dev_csv=None, min_freq=2):
     '依据 train_csv 或 dev_csv 来构建词典'
     train_tokens = ' '.join(list(train_csv['tokenstr'])).split() if train_csv is not None else []
     dev_tokens = ' '.join(list(dev_csv['tokenstr'])).split() if dev_csv is not None else []
@@ -28,17 +29,25 @@ def build_vocab(train_csv=None, dev_csv=None):
 class ta_dataset(tud.Dataset):
     "tamil classification"
 
-    def __init__(self, raw_csv, vocab):
+    def __init__(self, raw_csv, vocab, max_len):
         super().__init__()
+        self.raw_csv = raw_csv
         self.tokens = raw_csv['tokenstr']
         self.tags = raw_csv['tag']
         self.vocab = vocab
+        self.max_len = max_len
+
+        self.label2tag = list(set(self.tags))
+        self.tag2label = dict([(t, i) for i, t in enumerate(self.label2tag)])
+        self.labels = [self.tag2label[t] for t in self.tags]
     
     def __len__(self):
-        return len(self.raw_csv)
+        return self.raw_csv.shape[0]
     
     def __getitem__(self, index):
-        tokens = ['<cls>'] + self.tokens[index].split() + ['<sep>']
-        tag = self.tags[index]
+        raw_tokens = ['<cls>'] + self.tokens[index].split()
+        raw_tokens = raw_tokens + ['<pad>'] * (self.max_len - len(raw_tokens))
+        tokens = [self.vocab[t] for t in raw_tokens]
+        label = self.labels[index]
         
-        return
+        return torch.tensor(tokens).long(), torch.tensor(label).long()
